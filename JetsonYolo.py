@@ -1,15 +1,12 @@
 import cv2
 import numpy as np
 from elements.yolo import OBJ_DETECTION
-from api import api_caller
-Object_classes = ['Person','fire','black smoke' ]
+from api import FirebaseStorageUploader
+Object_classes = ['person','smoke','fire' ]
 
 Object_colors = list(np.random.rand(80,3)*255)
-Object_detector = OBJ_DETECTION('weights/best.pt', Object_classes)
-time_since_fire = 0
-caller = api_caller
-
-
+Object_detector = OBJ_DETECTION('weights/yolov5s.pt', Object_classes)
+Uploader = FirebaseStorageUploader
 def gstreamer_pipeline(
     capture_width=1280,
     capture_height=720,
@@ -49,14 +46,12 @@ if cap.isOpened():
         if ret:
             # detection process
             objs = Object_detector.detect(frame)
-            # plotting
             ai_fire = False
             ai_people = False
-
+            # plotting
             for obj in objs:
                 # print(obj)
                 label = obj['label']
-                
                 score = obj['score']
                 [(xmin,ymin),(xmax,ymax)] = obj['bbox']
                 color = Object_colors[Object_classes.index(label)]
@@ -64,16 +59,10 @@ if cap.isOpened():
                 frame = cv2.putText(frame, f'{label} ({str(score)})', (xmin,ymin), cv2.FONT_HERSHEY_SIMPLEX , 0.75, color, 1, cv2.LINE_AA)
                 if label == 'fire' or label == 'smoke':
                     ai_fire = True
-                if label=='Person':
+                if label=='person':
                     ai_people = True
             
-    
-                jpegframe = cv2.imwrite("fire.jpeg", frame, [cv2.IMWRITE_JPEG_QUALITY, 100])
-                caller.count_update(ai_fire,ai_people,jpegframe)
-
-                
-            
-
+            Uploader.check_fire(frame,ai_fire,ai_people)
         cv2.imshow("CSI Camera", frame)
         keyCode = cv2.waitKey(30)
         if keyCode == ord('q'):
